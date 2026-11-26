@@ -18,6 +18,8 @@
         <result property="classroom" column="classroom"/>
         <result property="maxStudents" column="max_students"/>
         <result property="currentStudents" column="current_students"/>
+        <result property="enrollStartTime" column="enroll_start_time"/>
+        <result property="enrollEndTime" column="enroll_end_time"/>
         <result property="createTime" column="create_time"/>
     </resultMap>
 
@@ -25,7 +27,8 @@
         c.id, c.name, c.code, c.credits, c.hours, c.type, c.description,
         t.id            AS teacher_id,
         u.real_name     AS teacher_name,
-        c.semester, c.schedule, c.classroom, c.max_students, c.current_students, c.create_time
+        c.semester, c.schedule, c.classroom, c.max_students, c.current_students,
+        c.enroll_start_time, c.enroll_end_time, c.create_time
     </sql>
 
     <sql id="courseVOJoin">

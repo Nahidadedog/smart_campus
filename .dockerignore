@@ -1,0 +1,8 @@
+# 构建后端镜像时不需要带进去的东西
+target
+data
+frontend
+.git
+.idea
+.vscode
+*.log

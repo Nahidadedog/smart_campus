@@ -21,6 +21,11 @@ public interface CourseMapper extends BaseMapper<Course> {
 
     CourseVO selectCourseVOById(Long id);
 
+    default boolean existsByCode(String code) {
+        return selectCount(com.baomidou.mybatisplus.core.toolkit.Wrappers.<Course>lambdaQuery()
+                .eq(Course::getCode, code)) > 0;
+    }
+
     // ---- 原子更新：选课名额的占用 / 释放 ----
 
     /**
@@ -35,4 +40,11 @@ public interface CourseMapper extends BaseMapper<Course> {
     @Update("update course set current_students = current_students - 1 "
             + "where id = #{id} and current_students > 0")
     int releaseSeat(@Param("id") Long id);
+
+    /**
+     * Redis 模式下维护数据库镜像列：名额已在 Redis 扣减，这里只做 +1，不再附加余量条件。
+     * 与选课记录的插入在同一事务内执行。
+     */
+    @Update("update course set current_students = current_students + 1 where id = #{id}")
+    int incrementStudents(@Param("id") Long id);
 }

@@ -21,5 +21,7 @@ public class CourseVO {
     private String classroom;
     private Integer maxStudents;
     private Integer currentStudents;
+    private LocalDateTime enrollStartTime;
+    private LocalDateTime enrollEndTime;
     private LocalDateTime createTime;
 }

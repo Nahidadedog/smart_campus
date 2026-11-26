@@ -44,9 +44,15 @@ export default function CourseList() {
 
   const handleSelect = async (course) => {
     try {
-      await selectCourse(course.id)
-      message.success(`已选课：${course.name}`)
-      reload()
+      const result = await selectCourse(course.id)
+      if (result?.status === 'PENDING') {
+        // 异步落库：名额已预占，记录稍后由消费者写入，稍等再刷新列表
+        message.info(`选课申请已受理：${course.name}`)
+        setTimeout(reload, 1000)
+      } else {
+        message.success(`已选课：${course.name}`)
+        reload()
+      }
     } catch (err) {
       message.error(err.message)
     }

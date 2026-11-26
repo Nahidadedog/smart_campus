@@ -1,4 +1,5 @@
-# 测试环境：H2 内存库，Flyway 建表并灌入演示数据
+# 测试环境：H2 内存库，Flyway 建表并灌入演示数据；默认走纯数据库 + 同步落库，不依赖任何中间件。
+# 需要 Redis / RabbitMQ 的用例使用 Testcontainers，没有 Docker 时自动跳过。
 spring:
   datasource:
     url: jdbc:h2:mem:smart-campus-test;MODE=MySQL;DB_CLOSE_DELAY=-1
@@ -8,6 +9,15 @@ spring:
   h2:
     console:
       enabled: false
+
+app:
+  selection:
+    stock: db
+    persist: sync
+    rate-limit:
+      enabled: false
+    local-cache:
+      course-ttl-seconds: 1
 
 jwt:
   secret: test-only-secret-key-at-least-32-bytes-long!!

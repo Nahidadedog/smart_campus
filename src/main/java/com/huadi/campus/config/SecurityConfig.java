@@ -86,6 +86,8 @@ public class SecurityConfig {
                         // API 文档与 H2 控制台（仅 dev 开启）
                         .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html",
                                 "/v3/api-docs/**", "/h2-console/**").permitAll()
+                        // 监控探针与指标抓取（Prometheus 无状态拉取，不能要求登录）
+                        .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(authenticationEntryPoint)

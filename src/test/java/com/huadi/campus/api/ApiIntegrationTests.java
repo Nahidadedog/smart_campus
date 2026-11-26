@@ -8,12 +8,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.sql.Timestamp;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -39,6 +41,8 @@ class ApiIntegrationTests {
     private MockMvc mockMvc;
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired
+    private JdbcTemplate jdbc;
 
     private String studentToken;
     private String teacherToken;
@@ -174,11 +178,14 @@ class ApiIntegrationTests {
 
     @Test
     void studentCannotEnrollTwiceAndCanReEnrollAfterDropping() throws Exception {
-        // student1 未选 CS401
+        // student1 未选 CS401（40 个名额，种子数据 0 人）；默认同步落库，响应即代表记录已写入
         mockMvc.perform(post("/api/student/courses/5").header("Authorization", bearer(studentToken)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.course.code").value("CS401"))
-                .andExpect(jsonPath("$.data.course.currentStudents").value(1));
+                .andExpect(jsonPath("$.data.courseId").value(5))
+                .andExpect(jsonPath("$.data.status").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.remaining").value(39));
+        mockMvc.perform(get("/api/public/courses/5"))
+                .andExpect(jsonPath("$.data.currentStudents").value(1));
 
         mockMvc.perform(post("/api/student/courses/5").header("Authorization", bearer(studentToken)))
                 .andExpect(status().isConflict())
@@ -194,6 +201,35 @@ class ApiIntegrationTests {
         // 测试结束后清理，避免影响其他用例
         mockMvc.perform(delete("/api/student/courses/5").header("Authorization", bearer(studentToken)))
                 .andExpect(status().isOk());
+        mockMvc.perform(get("/api/public/courses/5"))
+                .andExpect(jsonPath("$.data.currentStudents").value(0));
+    }
+
+    @Test
+    void selectingFullCourseReturns409() throws Exception {
+        // CS601（id=7）50 个名额，直接把数据库里的已选人数填满，再选应返回名额已满
+        jdbc.update("update course set current_students = max_students where id = 7");
+        try {
+            mockMvc.perform(post("/api/student/courses/7").header("Authorization", bearer(studentToken)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.message").value("课程名额已满"));
+        } finally {
+            jdbc.update("update course set current_students = 0 where id = 7");
+        }
+    }
+
+    @Test
+    void selectingCourseOutsideEnrollmentWindowReturns409() throws Exception {
+        // CS501（id=6）设置一个已经结束的选课窗口；该课程未被其它用例缓存过，本次请求会重新加载快照
+        jdbc.update("update course set enroll_start_time = ?, enroll_end_time = ? where id = 6",
+                Timestamp.valueOf("2020-01-01 00:00:00"), Timestamp.valueOf("2020-01-02 00:00:00"));
+        try {
+            mockMvc.perform(post("/api/student/courses/6").header("Authorization", bearer(studentToken)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.message").value("不在选课时间内"));
+        } finally {
+            jdbc.update("update course set enroll_start_time = null, enroll_end_time = null where id = 6");
+        }
     }
 
     @Test

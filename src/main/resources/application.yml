@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: smart-campus
+  datasource:
+    hikari:
+      # 连接池大小。选课请求只在 UPDATE / INSERT 的瞬间持有连接，Tomcat 线程远多于连接也不会出问题；
+      # 一旦出现"拿着连接去等锁或等第二个连接"的代码，10 个连接就足以让整个服务停摆（见 README 压测踩坑）
+      maximum-pool-size: ${DB_POOL_SIZE:10}
   profiles:
     # 默认使用 dev；生产环境通过 --spring.profiles.active=prod 覆盖
     active: dev
@@ -14,6 +19,30 @@ spring:
     locations: classpath:db/migration/{vendor},classpath:db/migration/common
     # 已有历史库首次接入 Flyway 时自动打基线，新库无影响
     baseline-on-migrate: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      # 命令超时要短：Redis 故障时能快速降级到数据库，而不是每个请求卡几十秒
+      timeout: 500ms
+      connect-timeout: 1s
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASS:guest}
+    connection-timeout: 2s
+    # 生产者确认：Broker 收到消息后回 ack，没收到就回补名额
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    listener:
+      simple:
+        # 消费失败不重新入队，直接进死信队列，避免毒消息无限重投
+        default-requeue-rejected: false
+        concurrency: 2
+        max-concurrency: 8
 
 mybatis-plus:
   mapper-locations: classpath*:mapper/*.xml
@@ -28,11 +57,43 @@ mybatis-plus:
 app:
   cors:
     allowed-origins: http://localhost:3000
+  selection:
+    # db | redis：名额在数据库原子 UPDATE 还是 Redis Lua 脚本里预占
+    stock: ${STOCK_MODE:db}
+    # sync | in-process | rabbit：选课记录同步写、线程池异步写、还是经 MQ 消费者写
+    persist: ${PERSIST_MODE:sync}
+    redis-key-prefix: campus
+    rate-limit:
+      # 令牌桶依赖 Redis，默认关闭；docker 编排里开启
+      enabled: ${RATE_LIMIT_ENABLED:false}
+      capacity: 5
+      refill-per-second: 1
+    local-cache:
+      course-ttl-seconds: 10
+      student-ttl-seconds: 300
+      max-size: 4096
+      # 缓存未命中时查库的线程数（实际上限 = 数据库连接池大小 / 2）
+      loader-threads: 4
+
 
 # 生产环境务必通过环境变量 JWT_SECRET 覆盖（至少 32 字节）
 jwt:
   secret: ${JWT_SECRET:dev-only-secret-key-change-me-in-production-0123456789abcdef}
   expiration: 24h
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  health:
+    redis:
+      enabled: false
+    rabbit:
+      enabled: false
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 springdoc:
   api-docs:

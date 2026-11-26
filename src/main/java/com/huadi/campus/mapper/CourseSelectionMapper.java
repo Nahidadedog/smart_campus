@@ -6,6 +6,7 @@ import com.huadi.campus.entity.CourseSelection;
 import com.huadi.campus.enums.SelectionStatus;
 import com.huadi.campus.vo.CourseSelectionVO;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 import java.util.Optional;
@@ -23,6 +24,18 @@ public interface CourseSelectionMapper extends BaseMapper<CourseSelection> {
                 .eq(CourseSelection::getStudentId, studentId)
                 .eq(CourseSelection::getCourseId, courseId)) > 0;
     }
+
+    /** 是否处于"已选"状态（退选过的记录不算） */
+    default boolean existsEnrolled(Long studentId, Long courseId) {
+        return selectCount(Wrappers.<CourseSelection>lambdaQuery()
+                .eq(CourseSelection::getStudentId, studentId)
+                .eq(CourseSelection::getCourseId, courseId)
+                .eq(CourseSelection::getStatus, SelectionStatus.ENROLLED)) > 0;
+    }
+
+    /** 某门课所有"已选"学生的 id，用于重建 Redis 名额缓存（以数据库为准） */
+    @Select("select student_id from course_selection where course_id = #{courseId} and status = 'ENROLLED'")
+    List<Long> listEnrolledStudentIds(@Param("courseId") Long courseId);
 
     default long countByStatus(SelectionStatus status) {
         return selectCount(Wrappers.<CourseSelection>lambdaQuery().eq(CourseSelection::getStatus, status));

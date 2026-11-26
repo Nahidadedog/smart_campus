@@ -2,10 +2,12 @@ package com.huadi.campus.controller;
 
 import com.huadi.campus.common.Result;
 import com.huadi.campus.dto.request.ContactUpdateRequest;
+import com.huadi.campus.ratelimit.RateLimit;
 import com.huadi.campus.security.UserPrincipal;
 import com.huadi.campus.service.StudentService;
 import com.huadi.campus.vo.CourseSelectionVO;
 import com.huadi.campus.vo.GradeVO;
+import com.huadi.campus.vo.SelectionResultVO;
 import com.huadi.campus.vo.StudentVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -51,9 +53,15 @@ public class StudentController {
         return Result.success(studentService.getMyCourses(principal.id()));
     }
 
-    @Operation(summary = "选课")
+    /**
+     * 选课接口是唯一的写热点：每个用户一个令牌桶，挡住脚本连点。
+     * 桶参数取 app.selection.rate-limit.capacity / refill-per-second（默认容量 5、每秒补 1），
+     * 限流只在 app.selection.rate-limit.enabled=true 时生效，超限返回 429。
+     */
+    @Operation(summary = "选课", description = "名额预占成功即返回；异步模式下 data.status=PENDING，稍后刷新我的选课")
+    @RateLimit(key = "'select:' + #principal.id()")
     @PostMapping("/courses/{courseId}")
-    public Result<CourseSelectionVO> selectCourse(@AuthenticationPrincipal UserPrincipal principal,
+    public Result<SelectionResultVO> selectCourse(@AuthenticationPrincipal UserPrincipal principal,
                                                   @PathVariable Long courseId) {
         return Result.success(studentService.selectCourse(principal.id(), courseId));
     }

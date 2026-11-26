@@ -1,0 +1,27 @@
+# docker 编排专用：基础设施地址为 compose 服务名，默认开启 Redis 预扣 + MQ 异步落库 + 限流。
+# 与 prod 叠加使用：SPRING_PROFILES_ACTIVE=prod,docker（prod 负责数据源环境变量，这里负责中间件与模式）
+#
+# 想对比纯数据库基线，只需改环境变量重建后端：
+#   STOCK_MODE=db PERSIST_MODE=sync RATE_LIMIT_ENABLED=false docker compose up -d backend
+spring:
+  data:
+    redis:
+      host: redis
+      port: 6379
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+
+app:
+  selection:
+    stock: ${STOCK_MODE:redis}
+    persist: ${PERSIST_MODE:rabbit}
+    rate-limit:
+      enabled: ${RATE_LIMIT_ENABLED:true}
+
+management:
+  health:
+    redis:
+      enabled: true
+    rabbit:
+      enabled: true

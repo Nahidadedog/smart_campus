@@ -1,0 +1,131 @@
+# 一键启动完整环境：MySQL + Redis + RabbitMQ + 后端 + 前端(Nginx) + Prometheus + Grafana
+#
+#   docker compose up -d --build          # 启动全部服务（后端以 prod,docker 配置运行：MySQL + Redis 预扣 + MQ 落库）
+#   docker compose logs -f backend        # 看后端日志（Flyway 迁移、缓存预热）
+#   docker compose --profile loadtest run --rm loadtest   # 跑 k6 抢课压测
+#   docker compose down -v                # 连数据库一起清掉
+#
+# 端口：前端 3000，后端 8080，MySQL 3306，Redis 6379，RabbitMQ 5672 / 管理界面 15672，Prometheus 9090，Grafana 3001
+name: smart-campus
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: campus-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-campus}
+      MYSQL_DATABASE: smart_campus
+      TZ: Asia/Shanghai
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_0900_ai_ci
+      --default-time-zone=+08:00
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    container_name: campus-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: campus-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"   # 管理界面，默认账号 guest / guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  backend:
+    build: .
+    container_name: campus-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: prod,docker
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: smart_campus
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-campus}
+      JWT_SECRET: ${JWT_SECRET:-docker-only-secret-key-change-me-0123456789abcdef}
+      SPRINGDOC_SWAGGER_UI_ENABLED: "true"
+      # 选课链路模式，改成 db / sync / false 即可跑纯数据库基线做对比压测
+      STOCK_MODE: ${STOCK_MODE:-redis}
+      PERSIST_MODE: ${PERSIST_MODE:-rabbit}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build: ./frontend
+    container_name: campus-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: campus-prometheus
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: campus-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+
+  # 压测服务默认不启动：docker compose --profile loadtest run --rm loadtest
+  loadtest:
+    profiles: ["loadtest"]
+    image: grafana/k6:latest
+    container_name: campus-k6
+    environment:
+      BASE_URL: http://backend:8080
+      STUDENTS: ${STUDENTS:-300}
+      SEATS: ${SEATS:-50}
+    volumes:
+      - ./loadtest:/scripts:ro
+    working_dir: /scripts
+    entrypoint: ["k6", "run", "/scripts/select-course.js"]
+    depends_on:
+      - backend
+
+volumes:
+  mysql-data:

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 仅供 Docker 构建使用：国内网络走阿里云镜像，否则依赖下载很慢 -->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+    <mirrors>
+        <!--
+          mirrorOf 用 *：部分依赖（如 flyway-mysql）的 pom 里声明了 GitHub Packages / S3 等仓库，
+          只代理 central 的话每个依赖都会去这些国内不通的仓库逐个超时，构建会卡十几分钟。
+          全部走阿里云后，镜像上没有的构件会立刻 404，而不是等连接超时。
+        -->
+        <mirror>
+            <id>aliyun</id>
+            <mirrorOf>*</mirrorOf>
+            <url>https://maven.aliyun.com/repository/public</url>
+        </mirror>
+    </mirrors>
+</settings>
