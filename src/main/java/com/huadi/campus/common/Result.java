@@ -1,37 +1,21 @@
 package com.huadi.campus.common;
 
-public class Result<T> {
-    private int code;
-    private String message;
-    private T data;
+/**
+ * 统一响应体：{ code, message, data }
+ * <p>
+ * 成功时 code 恒为 200；失败时 code 与 HTTP 状态码保持一致，方便前端统一处理。
+ */
+public record Result<T>(int code, String message, T data) {
 
     public static <T> Result<T> success(T data) {
-        Result<T> r = new Result<>();
-        r.code = 200;
-        r.message = "操作成功";
-        r.data = data;
-        return r;
+        return new Result<>(200, "操作成功", data);
     }
 
-    public static <T> Result<T> success() {
+    public static Result<Void> success() {
         return success(null);
     }
 
     public static <T> Result<T> error(int code, String message) {
-        Result<T> r = new Result<>();
-        r.code = code;
-        r.message = message;
-        return r;
+        return new Result<>(code, message, null);
     }
-
-    public static <T> Result<T> error(String message) {
-        return error(500, message);
-    }
-
-    public int getCode() { return code; }
-    public void setCode(int code) { this.code = code; }
-    public String getMessage() { return message; }
-    public void setMessage(String message) { this.message = message; }
-    public T getData() { return data; }
-    public void setData(T data) { this.data = data; }
 }

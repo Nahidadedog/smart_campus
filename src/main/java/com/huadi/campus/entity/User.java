@@ -1,28 +1,50 @@
 package com.huadi.campus.entity;
 
-import com.huadi.campus.common.UserRole;
-import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.huadi.campus.enums.UserRole;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import jakarta.validation.constraints.Email;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "sys_user")
+@Getter
+@Setter
+@NoArgsConstructor
 public class User {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false, length = 50)
+    @Column(nullable = false, unique = true, length = 50)
     private String username;
 
+    /** 密码哈希：禁止序列化输出，接口统一通过 VO 返回 */
+    @JsonIgnore
     @Column(nullable = false)
     private String password;
 
-    @Column(length = 100)
+    @Column(nullable = false, length = 100)
     private String realName;
 
     @Column(length = 50)
     private String phone;
 
+    @Email
     @Column(length = 100)
     private String email;
 
@@ -39,42 +61,19 @@ public class User {
     @Column(nullable = false)
     private Boolean enabled = true;
 
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createTime;
+
     private LocalDateTime updateTime;
 
     @PrePersist
-    public void prePersist() {
+    void onCreate() {
         this.createTime = LocalDateTime.now();
-        this.updateTime = LocalDateTime.now();
+        this.updateTime = this.createTime;
     }
 
     @PreUpdate
-    public void preUpdate() {
+    void onUpdate() {
         this.updateTime = LocalDateTime.now();
     }
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public String getUsername() { return username; }
-    public void setUsername(String username) { this.username = username; }
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
-    public String getRealName() { return realName; }
-    public void setRealName(String realName) { this.realName = realName; }
-    public String getPhone() { return phone; }
-    public void setPhone(String phone) { this.phone = phone; }
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-    public String getGender() { return gender; }
-    public void setGender(String gender) { this.gender = gender; }
-    public String getAvatar() { return avatar; }
-    public void setAvatar(String avatar) { this.avatar = avatar; }
-    public UserRole getRole() { return role; }
-    public void setRole(UserRole role) { this.role = role; }
-    public Boolean getEnabled() { return enabled; }
-    public void setEnabled(Boolean enabled) { this.enabled = enabled; }
-    public LocalDateTime getCreateTime() { return createTime; }
-    public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
-    public LocalDateTime getUpdateTime() { return updateTime; }
-    public void setUpdateTime(LocalDateTime updateTime) { this.updateTime = updateTime; }
 }

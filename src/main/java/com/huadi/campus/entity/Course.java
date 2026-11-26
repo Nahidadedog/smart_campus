@@ -1,11 +1,28 @@
 package com.huadi.campus.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "course")
+@Getter
+@Setter
+@NoArgsConstructor
 public class Course {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -28,7 +45,7 @@ public class Course {
     @Column(length = 200)
     private String description;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "teacher_id")
     private Teacher teacher;
 
@@ -44,43 +61,15 @@ public class Course {
     @Column
     private Integer maxStudents;
 
+    /** 已选人数。修改必须通过 CourseRepository 的原子更新语句，避免并发超选 */
     @Column
-    private Integer currentStudents;
+    private Integer currentStudents = 0;
 
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createTime;
 
     @PrePersist
-    public void prePersist() {
+    void onCreate() {
         this.createTime = LocalDateTime.now();
-        if (this.currentStudents == null) this.currentStudents = 0;
     }
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    public String getCode() { return code; }
-    public void setCode(String code) { this.code = code; }
-    public Double getCredits() { return credits; }
-    public void setCredits(Double credits) { this.credits = credits; }
-    public Integer getHours() { return hours; }
-    public void setHours(Integer hours) { this.hours = hours; }
-    public String getType() { return type; }
-    public void setType(String type) { this.type = type; }
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
-    public Teacher getTeacher() { return teacher; }
-    public void setTeacher(Teacher teacher) { this.teacher = teacher; }
-    public String getSemester() { return semester; }
-    public void setSemester(String semester) { this.semester = semester; }
-    public String getSchedule() { return schedule; }
-    public void setSchedule(String schedule) { this.schedule = schedule; }
-    public String getClassroom() { return classroom; }
-    public void setClassroom(String classroom) { this.classroom = classroom; }
-    public Integer getMaxStudents() { return maxStudents; }
-    public void setMaxStudents(Integer maxStudents) { this.maxStudents = maxStudents; }
-    public Integer getCurrentStudents() { return currentStudents; }
-    public void setCurrentStudents(Integer currentStudents) { this.currentStudents = currentStudents; }
-    public LocalDateTime getCreateTime() { return createTime; }
-    public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
 }

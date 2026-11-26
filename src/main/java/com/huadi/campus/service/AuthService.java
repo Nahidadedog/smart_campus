@@ -1,86 +1,80 @@
 package com.huadi.campus.service;
 
-import com.huadi.campus.common.UserRole;
 import com.huadi.campus.dto.request.LoginRequest;
 import com.huadi.campus.dto.request.RegisterRequest;
-import com.huadi.campus.dto.response.AuthResponse;
-import com.huadi.campus.entity.*;
-import com.huadi.campus.repository.*;
-import com.huadi.campus.security.JwtTokenProvider;
+import com.huadi.campus.entity.Student;
+import com.huadi.campus.entity.User;
+import com.huadi.campus.enums.UserRole;
+import com.huadi.campus.exception.ConflictException;
+import com.huadi.campus.exception.UnauthorizedException;
+import com.huadi.campus.repository.StudentRepository;
+import com.huadi.campus.repository.UserRepository;
+import com.huadi.campus.security.JwtService;
+import com.huadi.campus.security.UserPrincipal;
+import com.huadi.campus.vo.LoginVO;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
+    private final AuthenticationManager authenticationManager;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
     private final UserRepository userRepository;
     private final StudentRepository studentRepository;
-    private final TeacherRepository teacherRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final JwtTokenProvider jwtTokenProvider;
 
-    public AuthService(UserRepository userRepository, StudentRepository studentRepository,
-                       TeacherRepository teacherRepository, PasswordEncoder passwordEncoder,
-                       JwtTokenProvider jwtTokenProvider) {
-        this.userRepository = userRepository;
-        this.studentRepository = studentRepository;
-        this.teacherRepository = teacherRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.jwtTokenProvider = jwtTokenProvider;
+    /** 走标准 Spring Security 认证链（UserDetailsService + BCrypt），失败统一返回 401 且不区分用户名/密码错误 */
+    @Transactional(readOnly = true)
+    public LoginVO login(LoginRequest request) {
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.username(), request.password()));
+        } catch (AuthenticationException e) {
+            throw new UnauthorizedException("用户名或密码错误");
+        }
+        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
+        User user = userRepository.findById(principal.id())
+                .orElseThrow(() -> new UnauthorizedException("用户不存在"));
+        String token = jwtService.generateToken(user.getId(), user.getUsername(), user.getRole());
+        return LoginVO.from(user, token);
     }
 
-    public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new RuntimeException("密码错误");
-        }
-        if (!user.getEnabled()) {
-            throw new RuntimeException("账号已被禁用");
-        }
-        String token = jwtTokenProvider.generateToken(user.getUsername(), user.getRole().name());
-        return AuthResponse.builder()
-                .token(token)
-                .username(user.getUsername())
-                .realName(user.getRealName())
-                .role(user.getRole().name())
-                .build();
-    }
-
+    /** 仅支持学生自助注册；教师 / 领导 / 管理员账号由管理员维护 */
     @Transactional
-    public User register(RegisterRequest request) {
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new RuntimeException("用户名已存在");
+    public LoginVO register(RegisterRequest request) {
+        if (userRepository.existsByUsername(request.username())) {
+            throw new ConflictException("用户名已存在");
+        }
+        if (studentRepository.existsByStudentNo(request.studentNo())) {
+            throw new ConflictException("学号已存在");
         }
         User user = new User();
-        user.setUsername(request.getUsername());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRealName(request.getRealName());
-        user.setPhone(request.getPhone());
-        user.setEmail(request.getEmail());
-        user.setGender(request.getGender());
-        user.setRole(request.getRole());
+        user.setUsername(request.username());
+        user.setPassword(passwordEncoder.encode(request.password()));
+        user.setRealName(request.realName());
+        user.setPhone(request.phone());
+        user.setEmail(request.email());
+        user.setRole(UserRole.STUDENT);
         user = userRepository.save(user);
 
-        if (request.getRole() == UserRole.STUDENT) {
-            Student student = new Student();
-            student.setUser(user);
-            student.setStudentNo(request.getStudentNo());
-            student.setDepartment(request.getDepartment());
-            student.setMajor(request.getMajor());
-            student.setClassName(request.getClassName());
-            student.setEnrollmentYear(request.getEnrollmentYear());
-            studentRepository.save(student);
-        } else if (request.getRole() == UserRole.TEACHER) {
-            Teacher teacher = new Teacher();
-            teacher.setUser(user);
-            teacher.setTeacherNo(request.getTeacherNo());
-            teacher.setDepartment(request.getDepartment());
-            teacher.setTitle(request.getTitle());
-            teacher.setTeacherType(request.getTeacherType());
-            teacherRepository.save(teacher);
-        }
-        return user;
+        Student student = new Student();
+        student.setUser(user);
+        student.setStudentNo(request.studentNo());
+        student.setDepartment(request.department());
+        student.setMajor(request.major());
+        student.setClassName(request.className());
+        student.setEnrollmentYear(request.enrollmentYear());
+        studentRepository.save(student);
+
+        return LoginVO.from(user, jwtService.generateToken(user.getId(), user.getUsername(), user.getRole()));
     }
 }

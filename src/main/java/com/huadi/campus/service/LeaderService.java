@@ -1,15 +1,31 @@
 package com.huadi.campus.service;
 
-import com.huadi.campus.entity.*;
-import com.huadi.campus.repository.*;
+import com.huadi.campus.entity.Student;
+import com.huadi.campus.entity.Teacher;
+import com.huadi.campus.enums.SelectionStatus;
+import com.huadi.campus.repository.CourseRepository;
+import com.huadi.campus.repository.CourseSelectionRepository;
+import com.huadi.campus.repository.StudentRepository;
+import com.huadi.campus.repository.TeacherRepository;
+import com.huadi.campus.vo.CourseStatsVO;
+import com.huadi.campus.vo.StudentStatsVO;
+import com.huadi.campus.vo.StudentVO;
+import com.huadi.campus.vo.TeacherStatsVO;
+import com.huadi.campus.vo.TeacherVO;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/** 面向院系领导 / 管理员的统计与名册 */
 @Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class LeaderService {
 
     private final StudentRepository studentRepository;
@@ -17,57 +33,41 @@ public class LeaderService {
     private final CourseRepository courseRepository;
     private final CourseSelectionRepository courseSelectionRepository;
 
-    public LeaderService(StudentRepository studentRepository, TeacherRepository teacherRepository,
-                         CourseRepository courseRepository, CourseSelectionRepository courseSelectionRepository) {
-        this.studentRepository = studentRepository;
-        this.teacherRepository = teacherRepository;
-        this.courseRepository = courseRepository;
-        this.courseSelectionRepository = courseSelectionRepository;
+    public StudentStatsVO getStudentStatistics() {
+        List<Student> students = studentRepository.findAll();
+        return new StudentStatsVO(
+                students.size(),
+                countBy(students, Student::getDepartment),
+                countBy(students, Student::getStatus));
     }
 
-    public Map<String, Object> getStudentStatistics() {
-        Map<String, Object> stats = new HashMap<>();
-        List<Student> allStudents = studentRepository.findAll();
-        stats.put("totalStudents", allStudents.size());
-        Map<String, Long> byDepartment = allStudents.stream()
-                .filter(s -> s.getDepartment() != null)
-                .collect(Collectors.groupingBy(Student::getDepartment, Collectors.counting()));
-        stats.put("byDepartment", byDepartment);
-        Map<String, Long> byStatus = allStudents.stream()
-                .filter(s -> s.getStatus() != null)
-                .collect(Collectors.groupingBy(Student::getStatus, Collectors.counting()));
-        stats.put("byStatus", byStatus);
-        return stats;
+    public TeacherStatsVO getTeacherStatistics() {
+        List<Teacher> teachers = teacherRepository.findAll();
+        return new TeacherStatsVO(
+                teachers.size(),
+                countBy(teachers, Teacher::getTeacherType),
+                countBy(teachers, Teacher::getDepartment));
     }
 
-    public Map<String, Object> getTeacherStatistics() {
-        Map<String, Object> stats = new HashMap<>();
-        List<Teacher> allTeachers = teacherRepository.findAll();
-        stats.put("totalTeachers", allTeachers.size());
-        Map<String, Long> byType = allTeachers.stream()
-                .filter(t -> t.getTeacherType() != null)
-                .collect(Collectors.groupingBy(Teacher::getTeacherType, Collectors.counting()));
-        stats.put("byType", byType);
-        Map<String, Long> byDepartment = allTeachers.stream()
-                .filter(t -> t.getDepartment() != null)
-                .collect(Collectors.groupingBy(Teacher::getDepartment, Collectors.counting()));
-        stats.put("byDepartment", byDepartment);
-        return stats;
+    public CourseStatsVO getCourseStatistics() {
+        return new CourseStatsVO(
+                courseRepository.count(),
+                courseSelectionRepository.countByStatus(SelectionStatus.ENROLLED));
     }
 
-    public Map<String, Object> getCourseSelectionStatistics() {
-        Map<String, Object> stats = new HashMap<>();
-        List<Course> courses = courseRepository.findAll();
-        stats.put("totalCourses", courses.size());
-        stats.put("totalSelected", courseSelectionRepository.count());
-        return stats;
+    public List<StudentVO> getAllStudents() {
+        return studentRepository.findAll().stream().map(StudentVO::from).toList();
     }
 
-    public List<Student> getAllStudents() {
-        return studentRepository.findAll();
+    public List<TeacherVO> getAllTeachers() {
+        return teacherRepository.findAll().stream().map(TeacherVO::from).toList();
     }
 
-    public List<Teacher> getAllTeachers() {
-        return teacherRepository.findAll();
+    /** 按分类字段计数，结果按 key 排序，忽略空值 */
+    private static <T> Map<String, Long> countBy(List<T> items, Function<T, String> classifier) {
+        return items.stream()
+                .map(classifier)
+                .filter(key -> key != null && !key.isBlank())
+                .collect(Collectors.groupingBy(Function.identity(), TreeMap::new, Collectors.counting()));
     }
 }

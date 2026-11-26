@@ -1,0 +1,22 @@
+# 生产环境：MySQL，所有敏感信息通过环境变量注入
+# 启动：java -jar smart-campus.jar --spring.profiles.active=prod
+spring:
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:smart_campus}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+  h2:
+    console:
+      enabled: false
+  jpa:
+    hibernate:
+      # 正式上线建议改为 validate 并引入 Flyway 管理表结构
+      ddl-auto: update
+  sql:
+    init:
+      mode: never
+
+springdoc:
+  swagger-ui:
+    enabled: false
