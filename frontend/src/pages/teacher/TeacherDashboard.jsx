@@ -1,88 +1,100 @@
-import React, { useEffect, useState } from 'react'
-import { Card, Row, Col, Statistic, Typography, Descriptions, Tag, Space } from 'antd'
-import { BookOutlined, TeamOutlined, UserOutlined, IdcardOutlined, ExperimentOutlined, EnvironmentOutlined, ReadOutlined, DollarOutlined } from '@ant-design/icons'
-import { getTeacherProfile, getTeacherCourses } from '../../services/api'
+import { BookOutlined, ReadOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons'
+import { App, Card, Col, Descriptions, Row, Space, Statistic, Tag, Typography } from 'antd'
+import { useCallback, useEffect, useState } from 'react'
+import { getTeacherCourses, getTeacherProfile } from '../../services/api'
 
 const { Title } = Typography
 
 export default function TeacherDashboard() {
+  const { message } = App.useMessage()
   const [profile, setProfile] = useState(null)
-  const [courseCount, setCourseCount] = useState(0)
-  const [totalStudents, setTotalStudents] = useState(0)
+  const [courses, setCourses] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    try {
+      const [profileData, courseList] = await Promise.all([
+        getTeacherProfile(),
+        getTeacherCourses(),
+      ])
+      setProfile(profileData)
+      setCourses(courseList)
+    } catch (err) {
+      message.error(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [message])
 
   useEffect(() => {
-    getTeacherProfile().then(res => { if (res.code === 200) setProfile(res.data) })
-    getTeacherCourses().then(res => {
-      if (res.code === 200) {
-        const courses = res.data || []
-        setCourseCount(courses.length)
-        // 统计选课总人数
-        const total = courses.reduce((sum, c) => sum + (c.currentStudents || 0), 0)
-        setTotalStudents(total)
-      }
-    })
-  }, [])
+    load()
+  }, [load])
+
+  const totalStudents = courses.reduce((sum, c) => sum + (c.currentStudents ?? 0), 0)
+  const currentSemester = courses[0]?.semester
+
+  const profileItems = profile
+    ? [
+        { key: 'no', label: '工号', children: profile.teacherNo },
+        { key: 'name', label: '姓名', children: profile.realName },
+        { key: 'dept', label: '院系', children: profile.department },
+        { key: 'title', label: '职称', children: <Tag color="blue">{profile.title}</Tag> },
+        { key: 'type', label: '教师类型', children: profile.teacherType ?? '-' },
+        { key: 'area', label: '研究方向', children: profile.researchArea },
+        { key: 'office', label: '办公地点', children: profile.office },
+        {
+          key: 'contact',
+          label: '联系方式',
+          children: [profile.phone, profile.email].filter(Boolean).join(' / ') || '-',
+        },
+      ]
+    : []
 
   return (
     <div>
       <Title level={4}>教师首页</Title>
 
-      {/* 个人信息卡片 */}
-      {profile && (
-        <Card style={{ marginBottom: 24 }} title={<Space><UserOutlined /> 个人信息</Space>}>
-          <Descriptions bordered column={{ xs: 1, sm: 2, md: 3, lg: 4, xl: 4, xxl: 4 }} size="small">
-            <Descriptions.Item label={<Space><IdcardOutlined /> 工号</Space>}>
-              {profile.teacherNo}
-            </Descriptions.Item>
-            <Descriptions.Item label={<Space><UserOutlined /> 姓名</Space>}>
-              {profile.user?.realName}
-            </Descriptions.Item>
-            <Descriptions.Item label={<Space><TeamOutlined /> 院系</Space>}>
-              {profile.department}
-            </Descriptions.Item>
-            <Descriptions.Item label={<Space><ExperimentOutlined /> 职称</Space>}>
-              <Tag color="blue">{profile.title}</Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label={<Space><ReadOutlined /> 研究方向</Space>}>
-              {profile.researchArea}
-            </Descriptions.Item>
-            <Descriptions.Item label={<Space><EnvironmentOutlined /> 办公地点</Space>}>
-              {profile.office}
-            </Descriptions.Item>
-          </Descriptions>
-        </Card>
-      )}
+      <Card
+        loading={loading}
+        style={{ marginBottom: 24 }}
+        title={
+          <Space>
+            <UserOutlined /> 个人信息
+          </Space>
+        }
+      >
+        <Descriptions bordered column={{ xs: 1, sm: 2, md: 4 }} size="small" items={profileItems} />
+      </Card>
 
-      {/* 数据统计卡片 */}
       <Row gutter={24}>
-        <Col xs={24} sm={24} md={8}>
+        <Col xs={24} sm={8}>
           <Card>
             <Statistic
               title="授课门数"
-              value={courseCount}
-              prefix={<BookOutlined style={{ color: '#1890ff' }} />}
-              valueStyle={{ color: '#1890ff', fontWeight: 'bold' }}
+              value={courses.length}
+              prefix={<BookOutlined style={{ color: '#1677ff' }} />}
+              styles={{ content: { color: '#1677ff', fontWeight: 'bold' } }}
             />
           </Card>
         </Col>
-        <Col xs={24} sm={24} md={8}>
+        <Col xs={24} sm={8}>
           <Card>
             <Statistic
-              title="选课学生"
+              title="选课学生总数"
               value={totalStudents}
-              prefix={<TeamOutlined style={{ color: '#52c41a' }} />}
-              valueStyle={{ color: '#52c41a', fontWeight: 'bold' }}
               suffix="人"
+              prefix={<TeamOutlined style={{ color: '#52c41a' }} />}
+              styles={{ content: { color: '#52c41a', fontWeight: 'bold' } }}
             />
           </Card>
         </Col>
-        <Col xs={24} sm={24} md={8}>
+        <Col xs={24} sm={8}>
           <Card>
             <Statistic
-              title="教师类型"
-              value={profile?.teacherType || '-'}
-              prefix={<DollarOutlined style={{ color: '#fa8c16' }} />}
-              valueStyle={{ color: '#fa8c16', fontWeight: 'bold' }}
+              title="当前授课学期"
+              value={currentSemester ?? '-'}
+              prefix={<ReadOutlined style={{ color: '#fa8c16' }} />}
+              styles={{ content: { color: '#fa8c16', fontWeight: 'bold', fontSize: 24 } }}
             />
           </Card>
         </Col>

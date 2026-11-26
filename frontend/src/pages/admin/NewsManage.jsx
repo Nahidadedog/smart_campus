@@ -1,71 +1,213 @@
-import React, { useEffect, useState } from 'react'
-import { Table, Button, Typography, Tag, Modal, Form, Input, Select, message, Popconfirm } from 'antd'
-import { createNews, getNews } from '../../services/api'
+import { DeleteOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
+import {
+  App,
+  Button,
+  Card,
+  Form,
+  Input,
+  Modal,
+  Popconfirm,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from 'antd'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createNews, deleteNews, getAdminNews } from '../../services/api'
+import { formatDateTime } from '../../utils/format'
 
 const { Title } = Typography
+const { TextArea } = Input
+
+const CATEGORY_COLOR = { 校内新闻: 'blue', 学术动态: 'purple', 活动通知: 'green' }
 
 export default function NewsManage() {
-  const [data, setData] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [modalVisible, setModalVisible] = useState(false)
+  const { message } = App.useMessage()
   const [form] = Form.useForm()
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [searchText, setSearchText] = useState('')
 
-  const load = () => {
+  const load = useCallback(async () => {
+    try {
+      setData(await getAdminNews())
+    } catch (err) {
+      message.error(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [message])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  /** 用户操作后手动刷新：在事件回调里切换 loading，避免在 effect 里同步 setState */
+  const reload = () => {
     setLoading(true)
-    getNews().then(res => { if (res.code === 200) setData(res.data) }).finally(() => setLoading(false))
+    load()
   }
-  useEffect(load, [])
 
-  const handleCreate = async (values) => {
-    const res = await createNews({ ...values, publishTime: new Date() })
-    if (res.code === 200) {
-      message.success('发布成功')
-      setModalVisible(false)
-      form.resetFields()
-      load()
-    } else {
-      message.error(res.message)
+  const handleDelete = async (record) => {
+    try {
+      await deleteNews(record.id)
+      message.success(`已删除：${record.title}`)
+      reload()
+    } catch (err) {
+      message.error(err.message)
     }
   }
 
+  const handleCreate = async () => {
+    try {
+      const values = await form.validateFields()
+      setSaving(true)
+      await createNews(values)
+      message.success('新闻已发布')
+      setModalOpen(false)
+      form.resetFields()
+      reload()
+    } catch (err) {
+      if (err?.message) message.error(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const filteredData = useMemo(() => {
+    const keyword = searchText.trim().toLowerCase()
+    if (!keyword) return data
+    return data.filter(({ title, authorName, category }) =>
+      [title, authorName, category].some((field) => field?.toLowerCase().includes(keyword)),
+    )
+  }, [data, searchText])
+
   const columns = [
     { title: '标题', dataIndex: 'title', ellipsis: true },
-    { title: '分类', dataIndex: 'category', width: 100, render: v => <Tag color="blue">{v}</Tag> },
-    { title: '浏览量', dataIndex: 'viewCount', width: 80 },
-    { title: '作者', render: (_, r) => r.author?.realName, width: 120 },
-    { title: '发布时间', dataIndex: 'publishTime', width: 160 },
-    { title: '操作', width: 100, render: () => (
-      <Popconfirm title="确定删除？">
-        <Button danger size="small">删除</Button>
-      </Popconfirm>
-    )},
+    {
+      title: '分类',
+      dataIndex: 'category',
+      width: 100,
+      render: (c) => <Tag color={CATEGORY_COLOR[c] ?? 'default'}>{c}</Tag>,
+    },
+    { title: '作者', dataIndex: 'authorName', width: 100 },
+    { title: '浏览量', dataIndex: 'viewCount', width: 90, align: 'right' },
+    { title: '发布时间', dataIndex: 'publishTime', width: 160, render: (v) => formatDateTime(v) },
+    {
+      title: '操作',
+      width: 100,
+      render: (_, r) => (
+        <Popconfirm
+          title="确定删除该新闻？"
+          onConfirm={() => handleDelete(r)}
+          okText="删除"
+          okButtonProps={{ danger: true }}
+          cancelText="取消"
+        >
+          <Button danger size="small" icon={<DeleteOutlined />}>
+            删除
+          </Button>
+        </Popconfirm>
+      ),
+    },
   ]
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Title level={4}>新闻管理</Title>
-        <Button type="primary" onClick={() => setModalVisible(true)}>发布新闻</Button>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 16,
+          gap: 16,
+          flexWrap: 'wrap',
+        }}
+      >
+        <Title level={4} style={{ margin: 0 }}>
+          新闻管理
+        </Title>
+        <Space>
+          <Input
+            placeholder="搜索标题 / 分类 / 作者"
+            prefix={<SearchOutlined />}
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            style={{ width: 280 }}
+            allowClear
+          />
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
+            发布新闻
+          </Button>
+        </Space>
       </div>
-      <Table columns={columns} dataSource={data} rowKey="id" loading={loading}
-             pagination={{ pageSize: 10, showTotal: t => `共 ${t} 条` }} />
 
-      <Modal title="发布新闻" open={modalVisible} onCancel={() => setModalVisible(false)} footer={null}>
-        <Form form={form} onFinish={handleCreate} layout="vertical">
-          <Form.Item name="title" label="标题" rules={[{ required: true }]}>
-            <Input placeholder="请输入新闻标题" />
+      <Card>
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          rowKey="id"
+          loading={loading}
+          size="middle"
+          pagination={{ pageSize: 10, showTotal: (t) => `共 ${t} 条新闻` }}
+        />
+      </Card>
+
+      <Modal
+        title="发布新闻"
+        open={modalOpen}
+        onOk={handleCreate}
+        onCancel={() => setModalOpen(false)}
+        okText="发布"
+        cancelText="取消"
+        confirmLoading={saving}
+        destroyOnHidden
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={{ category: '校内新闻' }}
+          preserve={false}
+        >
+          <Form.Item
+            name="title"
+            label="标题"
+            rules={[
+              { required: true, message: '请输入标题' },
+              { max: 200, message: '标题不能超过 200 字' },
+            ]}
+          >
+            <Input placeholder="新闻标题" showCount maxLength={200} />
           </Form.Item>
-          <Form.Item name="content" label="内容" rules={[{ required: true }]}>
-            <Input.TextArea rows={6} placeholder="请输入新闻内容" />
+          <Form.Item
+            name="content"
+            label="内容"
+            rules={[{ required: true, message: '请输入内容' }]}
+          >
+            <TextArea rows={6} placeholder="新闻正文" />
           </Form.Item>
-          <Form.Item name="category" label="分类" initialValue="校园动态">
-            <Select options={[{ value: '校园动态' }, { value: '学术讲座' }, { value: '活动通知' }]} />
+          <Form.Item
+            name="category"
+            label="分类"
+            rules={[{ required: true, message: '请选择分类' }]}
+          >
+            <Select
+              style={{ width: 200 }}
+              options={Object.keys(CATEGORY_COLOR).map((c) => ({ value: c }))}
+            />
           </Form.Item>
-          <Form.Item name="coverImage" label="封面图URL">
-            <Input placeholder="可选，输入图片URL" />
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" htmlType="submit" block>发布</Button>
+          <Form.Item
+            name="coverImage"
+            label="封面图片地址"
+            rules={[
+              { max: 500, message: '地址不能超过 500 个字符' },
+              { type: 'url', message: '请输入合法的 URL' },
+            ]}
+          >
+            <Input placeholder="https://...（可选）" />
           </Form.Item>
         </Form>
       </Modal>

@@ -1,105 +1,140 @@
-import React, { useEffect, useState } from 'react'
-import { Typography, Card, Row, Col, List, Button, Modal, Tag } from 'antd'
+import { App, Button, Card, Col, List, Modal, Row, Tag, Typography } from 'antd'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getAnnouncements, getNews, getAnnouncement, getNewsDetail } from '../../services/api'
+import { getAnnouncement, getAnnouncements, getNews, getNewsDetail } from '../../services/api'
+import { getSession } from '../../utils/auth'
+import { formatDateTime } from '../../utils/format'
 
-const { Title } = Typography
+const { Title, Paragraph } = Typography
 
 export default function Home() {
+  const navigate = useNavigate()
+  const { message } = App.useMessage()
+
   const [announcements, setAnnouncements] = useState([])
   const [news, setNews] = useState([])
-  const [modalVisible, setModalVisible] = useState(false)
-  const [modalData, setModalData] = useState(null)
-  const [modalType, setModalType] = useState('') // 'announcement' or 'news'
-  const navigate = useNavigate()
+  const [loading, setLoading] = useState(true)
+  const [detail, setDetail] = useState(null) // { kind: 'announcement' | 'news', data }
+
+  const load = useCallback(async () => {
+    try {
+      const [announcementList, newsList] = await Promise.all([getAnnouncements(), getNews()])
+      setAnnouncements(announcementList)
+      setNews(newsList)
+    } catch (err) {
+      message.error(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [message])
 
   useEffect(() => {
-    getAnnouncements().then(res => { if (res.code === 200) setAnnouncements(res.data) }).catch(() => {})
-    getNews().then(res => { if (res.code === 200) setNews(res.data) }).catch(() => {})
-  }, [])
+    load()
+  }, [load])
 
-  const handleAnnouncementClick = async (id) => {
-    const res = await getAnnouncement(id)
-    if (res.code === 200) {
-      setModalData(res.data)
-      setModalType('announcement')
-      setModalVisible(true)
+  const openAnnouncement = async (id) => {
+    try {
+      setDetail({ kind: 'announcement', data: await getAnnouncement(id) })
+    } catch (err) {
+      message.error(err.message)
     }
   }
 
-  const handleNewsClick = async (id) => {
-    const res = await getNewsDetail(id)
-    if (res.code === 200) {
-      setModalData(res.data)
-      setModalType('news')
-      setModalVisible(true)
-      // 实时更新列表中该新闻的浏览次数
-      setNews(prev => prev.map(item => item.id === id ? { ...item, viewCount: res.data.viewCount } : item))
+  const openNews = async (id) => {
+    try {
+      const data = await getNewsDetail(id)
+      setDetail({ kind: 'news', data })
+      // 详情接口会让浏览量 +1，同步更新列表中的数字
+      setNews((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, viewCount: data.viewCount } : item)),
+      )
+    } catch (err) {
+      message.error(err.message)
     }
   }
+
+  const session = getSession()
+  const entryPath = session?.token ? `/${session.role.toLowerCase()}` : '/login'
+  const entryText = session?.token ? '进入我的门户' : '登录系统'
+
+  const renderList = (items, kind) => (
+    <List
+      loading={loading}
+      dataSource={items}
+      locale={{ emptyText: '暂无内容' }}
+      renderItem={(item) => (
+        <List.Item
+          style={{ cursor: 'pointer' }}
+          onClick={() => (kind === 'news' ? openNews(item.id) : openAnnouncement(item.id))}
+        >
+          <List.Item.Meta
+            title={
+              <span>
+                {kind === 'announcement' && item.top && (
+                  <Tag color="red" style={{ marginRight: 8 }}>
+                    置顶
+                  </Tag>
+                )}
+                {item.title}
+              </span>
+            }
+            description={
+              kind === 'news'
+                ? `${formatDateTime(item.publishTime)} · 浏览 ${item.viewCount}`
+                : `${item.type} · ${formatDateTime(item.publishTime)}`
+            }
+          />
+        </List.Item>
+      )}
+    />
+  )
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24 }}>
-      <div style={{ textAlign: 'center', marginBottom: 40 }}>
-        <Title level={2}>智慧校园服务平台</Title>
-        <p style={{ color: '#666', fontSize: 16 }}>整合校园信息，提供便捷服务</p>
-        <Button type="primary" size="large" onClick={() => navigate('/login')}>登录系统</Button>
+      <div style={{ textAlign: 'center', margin: '24px 0 40px' }}>
+        <Title level={2} style={{ marginBottom: 8 }}>
+          智慧校园服务平台
+        </Title>
+        <Paragraph type="secondary" style={{ fontSize: 16 }}>
+          整合校园信息，提供便捷服务
+        </Paragraph>
+        <Button type="primary" size="large" onClick={() => navigate(entryPath)}>
+          {entryText}
+        </Button>
       </div>
+
       <Row gutter={24}>
-        <Col span={12}>
+        <Col xs={24} md={12}>
           <Card title="系统公告" size="small">
-            <List dataSource={announcements} renderItem={item => (
-              <List.Item>
-                <List.Item.Meta
-                  title={
-                    <a onClick={() => handleAnnouncementClick(item.id)} style={{ cursor: 'pointer', color: '#1890ff' }}>
-                      {item.top && <Tag color="red" style={{ marginRight: 8 }}>置顶</Tag>}
-                      {item.title}
-                    </a>
-                  }
-                  description={item.publishTime}
-                />
-              </List.Item>
-            )} locale={{ emptyText: '暂无公告' }} />
+            {renderList(announcements, 'announcement')}
           </Card>
         </Col>
-        <Col span={12}>
+        <Col xs={24} md={12}>
           <Card title="学校新闻" size="small">
-            <List dataSource={news} renderItem={item => (
-              <List.Item>
-                <List.Item.Meta
-                  title={
-                    <a onClick={() => handleNewsClick(item.id)} style={{ cursor: 'pointer', color: '#1890ff' }}>
-                      {item.title}
-                    </a>
-                  }
-                  description={`${item.publishTime} 浏览:${item.viewCount}`}
-                />
-              </List.Item>
-            )} locale={{ emptyText: '暂无新闻' }} />
+            {renderList(news, 'news')}
           </Card>
         </Col>
       </Row>
 
-      {/* 详情弹窗 */}
       <Modal
-        title={modalType === 'announcement' ? '公告详情' : '新闻详情'}
-        open={modalVisible}
-        onCancel={() => setModalVisible(false)}
+        title={detail?.kind === 'announcement' ? '公告详情' : '新闻详情'}
+        open={Boolean(detail)}
+        onCancel={() => setDetail(null)}
         footer={null}
-        width={700}
+        width={720}
       >
-        {modalData && (
-          <div>
-            <Title level={4}>{modalData.title}</Title>
-            <p style={{ color: '#999', marginBottom: 16 }}>
-              {modalType === 'announcement'
-                ? <>类型：{modalData.type} | 发布时间：{modalData.publishTime}</>
-                : <>分类：{modalData.category} | 发布时间：{modalData.publishTime} | 浏览：{modalData.viewCount}</>
-              }
-            </p>
-            <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{modalData.content}</div>
-          </div>
+        {detail && (
+          <article>
+            <Title level={4} style={{ marginBottom: 8 }}>
+              {detail.data.title}
+            </Title>
+            <Paragraph type="secondary" style={{ marginBottom: 16 }}>
+              {detail.kind === 'announcement'
+                ? `类型：${detail.data.type} · 发布时间：${formatDateTime(detail.data.publishTime)}`
+                : `分类：${detail.data.category} · 发布时间：${formatDateTime(detail.data.publishTime)} · 浏览：${detail.data.viewCount}`}
+            </Paragraph>
+            <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.9 }}>{detail.data.content}</div>
+          </article>
         )}
       </Modal>
     </div>

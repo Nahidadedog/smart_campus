@@ -1,129 +1,137 @@
-import React, { useEffect, useState } from 'react'
-import { Card, Row, Col, Statistic, Typography, Descriptions, Tag, Space, Badge } from 'antd'
-import { TeamOutlined, UserOutlined, BookOutlined, PieChartOutlined, ReadOutlined, DollarOutlined, ExperimentOutlined, EnvironmentOutlined } from '@ant-design/icons'
-import { getStudentStats, getTeacherStats, getCourseStats } from '../../services/api'
+import { BookOutlined, ReadOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons'
+import { App, Card, Col, Descriptions, Empty, Row, Space, Statistic, Tag, Typography } from 'antd'
+import { useCallback, useEffect, useState } from 'react'
+import { getCourseStats, getStudentStats, getTeacherStats } from '../../services/api'
 
-const { Title } = Typography
+const { Title, Text } = Typography
 
-const COLORS = ['#1890ff', '#52c41a', '#fa8c16', '#f5222d', '#722ed1', '#13c2c2']
+/** 把 { key: count } 渲染成 "标签 数量" 列表 */
+function Distribution({ data, color }) {
+  const entries = Object.entries(data ?? {})
+  if (entries.length === 0)
+    return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" />
+  return (
+    <Space direction="vertical" size="small">
+      {entries.map(([key, count]) => (
+        <Space key={key} size="middle">
+          <Tag color={color}>{key}</Tag>
+          <Text strong>{count}</Text>
+        </Space>
+      ))}
+    </Space>
+  )
+}
 
 export default function LeaderDashboard() {
-  const [studentStats, setStudentStats] = useState({})
-  const [teacherStats, setTeacherStats] = useState({})
-  const [courseStats, setCourseStats] = useState({})
+  const { message } = App.useMessage()
+  const [stats, setStats] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    try {
+      const [students, teachers, courses] = await Promise.all([
+        getStudentStats(),
+        getTeacherStats(),
+        getCourseStats(),
+      ])
+      setStats({ students, teachers, courses })
+    } catch (err) {
+      message.error(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [message])
 
   useEffect(() => {
-    getStudentStats().then(res => { if (res.code === 200) setStudentStats(res.data) })
-    getTeacherStats().then(res => { if (res.code === 200) setTeacherStats(res.data) })
-    getCourseStats().then(res => { if (res.code === 200) setCourseStats(res.data) })
-  }, [])
-
-  // 分布数据转描述项
-  const buildDescItems = (dataObj, colorBase = 0) => {
-    if (!dataObj) return []
-    return Object.entries(dataObj).map(([k, v], idx) => ({
-      label: k,
-      children: <Tag color={COLORS[(colorBase + idx) % COLORS.length]}>{v} 人</Tag>
-    }))
-  }
+    load()
+  }, [load])
 
   return (
     <div>
-      <Title level={4}>领导首页 - 数据概览</Title>
+      <Title level={4}>数据概览</Title>
 
-      {/* 统计卡片 */}
-      <Row gutter={24} style={{ marginBottom: 24 }}>
-        <Col xs={24} sm={24} md={8}>
-          <Card>
+      <Row gutter={[24, 24]}>
+        <Col xs={24} sm={12} lg={6}>
+          <Card loading={loading}>
             <Statistic
-              title={<Space><UserOutlined /> 在校学生总数</Space>}
-              value={studentStats.totalStudents || 0}
-              prefix={<UserOutlined style={{ color: '#1890ff' }} />}
-              valueStyle={{ color: '#1890ff', fontWeight: 'bold' }}
-              suffix="人"
+              title="学生总数"
+              value={stats?.students.totalStudents ?? 0}
+              prefix={<UserOutlined style={{ color: '#1677ff' }} />}
+              styles={{ content: { color: '#1677ff', fontWeight: 'bold' } }}
             />
           </Card>
         </Col>
-        <Col xs={24} sm={24} md={8}>
-          <Card>
+        <Col xs={24} sm={12} lg={6}>
+          <Card loading={loading}>
             <Statistic
-              title={<Space><TeamOutlined /> 教师总数</Space>}
-              value={teacherStats.totalTeachers || 0}
+              title="教师总数"
+              value={stats?.teachers.totalTeachers ?? 0}
               prefix={<TeamOutlined style={{ color: '#52c41a' }} />}
-              valueStyle={{ color: '#52c41a', fontWeight: 'bold' }}
-              suffix="人"
+              styles={{ content: { color: '#52c41a', fontWeight: 'bold' } }}
             />
           </Card>
         </Col>
-        <Col xs={24} sm={24} md={8}>
-          <Card>
+        <Col xs={24} sm={12} lg={6}>
+          <Card loading={loading}>
             <Statistic
-              title={<Space><BookOutlined /> 开设课程</Space>}
-              value={courseStats.totalCourses || 0}
-              prefix={<BookOutlined style={{ color: '#fa8c16' }} />}
-              valueStyle={{ color: '#fa8c16', fontWeight: 'bold' }}
-              suffix="门"
+              title="开课门数"
+              value={stats?.courses.totalCourses ?? 0}
+              prefix={<ReadOutlined style={{ color: '#fa8c16' }} />}
+              styles={{ content: { color: '#fa8c16', fontWeight: 'bold' } }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card loading={loading}>
+            <Statistic
+              title="有效选课记录"
+              value={stats?.courses.totalSelections ?? 0}
+              prefix={<BookOutlined style={{ color: '#722ed1' }} />}
+              styles={{ content: { color: '#722ed1', fontWeight: 'bold' } }}
             />
           </Card>
         </Col>
       </Row>
 
-      {/* 分布数据 */}
-      <Row gutter={24} style={{ marginBottom: 24 }}>
-        <Col xs={24} md={12}>
-          <Card
-            title={<Space><PieChartOutlined /> 学生按院系分布</Space>}
-            style={{ marginBottom: 24 }}
-          >
+      <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
+        <Col xs={24} lg={12}>
+          <Card title="学生分布" loading={loading}>
             <Descriptions
-              bordered
-              column={{ xs: 1, sm: 2, md: 2 }}
+              column={1}
               size="small"
-              items={buildDescItems(studentStats.byDepartment, 0)}
+              items={[
+                {
+                  key: 'dept',
+                  label: '按院系',
+                  children: <Distribution data={stats?.students.byDepartment} color="blue" />,
+                },
+                {
+                  key: 'status',
+                  label: '按状态',
+                  children: <Distribution data={stats?.students.byStatus} color="green" />,
+                },
+              ]}
             />
           </Card>
         </Col>
-        <Col xs={24} md={12}>
-          <Card
-            title={<Space><ExperimentOutlined /> 教师按类型分布</Space>}
-            style={{ marginBottom: 24 }}
-          >
+        <Col xs={24} lg={12}>
+          <Card title="教师分布" loading={loading}>
             <Descriptions
-              bordered
-              column={{ xs: 1, sm: 2, md: 2 }}
+              column={1}
               size="small"
-              items={buildDescItems(teacherStats.byType, 2)}
+              items={[
+                {
+                  key: 'type',
+                  label: '按类型',
+                  children: <Distribution data={stats?.teachers.byType} color="purple" />,
+                },
+                {
+                  key: 'dept',
+                  label: '按院系',
+                  children: <Distribution data={stats?.teachers.byDepartment} color="orange" />,
+                },
+              ]}
             />
-          </Card>
-        </Col>
-      </Row>
-
-      {/* 额外统计 */}
-      <Row gutter={24}>
-        <Col xs={24} md={12}>
-          <Card title={<Space><ReadOutlined /> 学生按状态分布</Space>}>
-            <Space wrap>
-              {studentStats.byStatus && Object.entries(studentStats.byStatus).map(([k, v], idx) => (
-                <Badge
-                  key={k}
-                  count={`${k}: ${v}人`}
-                  style={{ backgroundColor: COLORS[idx % COLORS.length], fontSize: '14px', padding: '0 8px' }}
-                />
-              ))}
-            </Space>
-          </Card>
-        </Col>
-        <Col xs={24} md={12}>
-          <Card title={<Space><EnvironmentOutlined /> 教师按院系分布</Space>}>
-            <Space wrap>
-              {teacherStats.byDepartment && Object.entries(teacherStats.byDepartment).map(([k, v], idx) => (
-                <Badge
-                  key={k}
-                  count={`${k}: ${v}人`}
-                  style={{ backgroundColor: COLORS[(idx + 3) % COLORS.length], fontSize: '14px', padding: '0 8px' }}
-                />
-              ))}
-            </Space>
           </Card>
         </Col>
       </Row>
