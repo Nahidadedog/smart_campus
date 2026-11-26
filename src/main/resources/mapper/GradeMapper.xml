@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.huadi.campus.mapper.GradeMapper">
+
+    <sql id="gradeVOColumns">
+        g.id,
+        st.id        AS student_id,
+        st.student_no,
+        u.real_name  AS student_name,
+        c.id         AS course_id,
+        c.name       AS course_name,
+        g.score, g.grade_level, g.credits, g.status, g.semester, g.create_time
+    </sql>
+
+    <sql id="gradeVOJoin">
+        FROM grade g
+        JOIN student  st ON st.id = g.student_id
+        JOIN sys_user u  ON u.id  = st.user_id
+        JOIN course   c  ON c.id  = g.course_id
+    </sql>
+
+    <!-- 学生成绩单，可按学期过滤 -->
+    <select id="selectVOByStudent" resultType="com.huadi.campus.vo.GradeVO">
+        SELECT
+        <include refid="gradeVOColumns"/>
+        <include refid="gradeVOJoin"/>
+        WHERE g.student_id = #{studentId}
+        <if test="semester != null and semester != ''">
+            AND g.semester = #{semester}
+        </if>
+        ORDER BY g.semester DESC, g.id
+    </select>
+
+    <!-- 某门课的成绩单 -->
+    <select id="selectVOByCourse" resultType="com.huadi.campus.vo.GradeVO">
+        SELECT
+        <include refid="gradeVOColumns"/>
+        <include refid="gradeVOJoin"/>
+        WHERE g.course_id = #{courseId}
+        ORDER BY g.semester DESC, st.student_no
+    </select>
+
+    <select id="selectVOById" resultType="com.huadi.campus.vo.GradeVO">
+        SELECT
+        <include refid="gradeVOColumns"/>
+        <include refid="gradeVOJoin"/>
+        WHERE g.id = #{id}
+    </select>
+
+</mapper>

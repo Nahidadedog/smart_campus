@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.huadi.campus.mapper.StudentMapper">
+
+    <!-- 学生 + 登录账号拍平，不取 password -->
+    <sql id="studentVOColumns">
+        st.id, st.user_id, u.username, u.real_name, u.phone, u.email,
+        st.student_no, st.department, st.major, st.class_name, st.enrollment_year,
+        st.status, st.dormitory, st.total_credits, st.card_balance, st.create_time
+    </sql>
+
+    <select id="selectStudentVOList" resultType="com.huadi.campus.vo.StudentVO">
+        SELECT
+        <include refid="studentVOColumns"/>
+        FROM student st
+        JOIN sys_user u ON u.id = st.user_id
+        ORDER BY st.id
+    </select>
+
+    <select id="selectStudentVOByUserId" resultType="com.huadi.campus.vo.StudentVO">
+        SELECT
+        <include refid="studentVOColumns"/>
+        FROM student st
+        JOIN sys_user u ON u.id = st.user_id
+        WHERE st.user_id = #{userId}
+    </select>
+
+</mapper>

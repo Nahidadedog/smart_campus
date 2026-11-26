@@ -1,4 +1,4 @@
-# 生产环境：MySQL，所有敏感信息通过环境变量注入
+# 生产环境：MySQL，所有敏感信息通过环境变量注入；表结构由 Flyway 管理
 # 启动：java -jar smart-campus.jar --spring.profiles.active=prod
 spring:
   datasource:
@@ -9,13 +9,6 @@ spring:
   h2:
     console:
       enabled: false
-  jpa:
-    hibernate:
-      # 正式上线建议改为 validate 并引入 Flyway 管理表结构
-      ddl-auto: update
-  sql:
-    init:
-      mode: never
 
 springdoc:
   swagger-ui:

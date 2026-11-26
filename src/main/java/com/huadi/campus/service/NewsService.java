@@ -5,8 +5,8 @@ import com.huadi.campus.entity.News;
 import com.huadi.campus.entity.User;
 import com.huadi.campus.exception.BadRequestException;
 import com.huadi.campus.exception.ResourceNotFoundException;
-import com.huadi.campus.repository.NewsRepository;
-import com.huadi.campus.repository.UserRepository;
+import com.huadi.campus.mapper.NewsMapper;
+import com.huadi.campus.mapper.UserMapper;
 import com.huadi.campus.vo.NewsVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,30 +21,30 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class NewsService {
 
-    private final NewsRepository newsRepository;
-    private final UserRepository userRepository;
+    private static final int PORTAL_LIMIT = 10;
+
+    private final NewsMapper newsMapper;
+    private final UserMapper userMapper;
 
     /** 门户展示：按分类筛选，否则返回最近 10 条 */
     public List<NewsVO> listForPortal(String category) {
-        List<News> list = StringUtils.hasText(category)
-                ? newsRepository.findByCategoryOrderByPublishTimeDesc(category)
-                : newsRepository.findTop10ByOrderByPublishTimeDesc();
-        return list.stream().map(NewsVO::from).toList();
+        return newsMapper.selectVOList(StringUtils.hasText(category) ? category : null, PORTAL_LIMIT);
     }
 
     /** 详情：浏览量原子 +1 */
     @Transactional
     public NewsVO getDetailAndCountView(Long id) {
-        newsRepository.incrementViewCount(id);
-        News news = newsRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("新闻不存在"));
-        return NewsVO.from(news);
+        newsMapper.incrementViewCount(id);
+        NewsVO vo = newsMapper.selectVOById(id);
+        if (vo == null) {
+            throw new ResourceNotFoundException("新闻不存在");
+        }
+        return vo;
     }
 
     /** 管理后台：全量列表 */
     public List<NewsVO> listAll() {
-        return newsRepository.findAll(NewsRepository.DEFAULT_SORT)
-                .stream().map(NewsVO::from).toList();
+        return newsMapper.selectVOList(null, null);
     }
 
     @Transactional
@@ -52,23 +52,26 @@ public class NewsService {
         if (!StringUtils.hasText(request.category())) {
             throw new BadRequestException("新闻分类不能为空");
         }
-        User author = userRepository.findById(authorId)
-                .orElseThrow(() -> new ResourceNotFoundException("作者不存在"));
+        User author = userMapper.selectById(authorId);
+        if (author == null) {
+            throw new ResourceNotFoundException("作者不存在");
+        }
         News news = new News();
         news.setTitle(request.title());
         news.setContent(request.content());
         news.setCategory(request.category());
         news.setCoverImage(request.coverImage());
         news.setPublishTime(LocalDateTime.now());
-        news.setAuthor(author);
-        return NewsVO.from(newsRepository.save(news));
+        news.setAuthorId(authorId);
+        newsMapper.insert(news);
+        return newsMapper.selectVOById(news.getId());
     }
 
     @Transactional
     public void delete(Long id) {
-        if (!newsRepository.existsById(id)) {
+        if (newsMapper.selectById(id) == null) {
             throw new ResourceNotFoundException("新闻不存在");
         }
-        newsRepository.deleteById(id);
+        newsMapper.deleteById(id);
     }
 }

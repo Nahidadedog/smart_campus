@@ -21,17 +21,34 @@
         <java.version>17</java.version>
         <jjwt.version>0.12.7</jjwt.version>
         <springdoc.version>2.8.17</springdoc.version>
+        <mybatis-plus.version>3.5.18</mybatis-plus.version>
     </properties>
 
     <dependencies>
-        <!-- Web / JPA / Security / 参数校验 -->
+        <!-- Web / MyBatis-Plus / Security / 参数校验 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-jpa</artifactId>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
+        <!-- 分页插件 PaginationInnerInterceptor 自 3.5.9 起拆到独立模块（依赖 JSqlParser） -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
+        <!-- 表结构版本管理：flyway-mysql 是 Flyway 10+ 对 MySQL 的独立支持包 -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

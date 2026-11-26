@@ -1,4 +1,4 @@
-# 测试环境：H2 内存库，每次启动重建表并灌入 data.sql
+# 测试环境：H2 内存库，Flyway 建表并灌入演示数据
 spring:
   datasource:
     url: jdbc:h2:mem:smart-campus-test;MODE=MySQL;DB_CLOSE_DELAY=-1
@@ -8,13 +8,6 @@ spring:
   h2:
     console:
       enabled: false
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
-    defer-datasource-initialization: true
-  sql:
-    init:
-      mode: always
 
 jwt:
   secret: test-only-secret-key-at-least-32-bytes-long!!
@@ -22,4 +15,4 @@ jwt:
 
 logging:
   level:
-    org.hibernate.SQL: warn
+    com.huadi.campus.mapper: warn

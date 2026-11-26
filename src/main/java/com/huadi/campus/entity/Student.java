@@ -1,77 +1,41 @@
 package com.huadi.campus.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
-import jakarta.persistence.Table;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "student")
 @Getter
 @Setter
 @NoArgsConstructor
+@TableName("student")
 public class Student {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", unique = true, nullable = false)
-    private User user;
+    /** 关联 sys_user.id */
+    private Long userId;
 
-    @Column(unique = true, length = 20)
     private String studentNo;
-
-    @Column(length = 100)
     private String department;
-
-    @Column(length = 100)
     private String major;
-
-    @Column(length = 50)
     private String className;
-
-    @Column(length = 20)
     private String enrollmentYear;
-
-    @Column(length = 20)
     private String status = "在读";
-
-    @Column(length = 100)
     private String dormitory;
-
-    @Column
     private Double totalCredits = 0.0;
-
-    @Column
     private Double cardBalance = 0.0;
 
-    @Column(nullable = false, updatable = false)
+    @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
+    @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
-
-    @PrePersist
-    void onCreate() {
-        this.createTime = LocalDateTime.now();
-        this.updateTime = this.createTime;
-    }
-
-    @PreUpdate
-    void onUpdate() {
-        this.updateTime = LocalDateTime.now();
-    }
 }

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.huadi.campus.mapper.NewsMapper">
+
+    <sql id="newsVOColumns">
+        n.id, n.title, n.content, n.cover_image, n.category,
+        u.id        AS author_id,
+        u.real_name AS author_name,
+        n.view_count, n.publish_time, n.create_time
+    </sql>
+
+    <!-- 发布时间倒序；limit 为空时不截断 -->
+    <select id="selectVOList" resultType="com.huadi.campus.vo.NewsVO">
+        SELECT
+        <include refid="newsVOColumns"/>
+        FROM news n
+        LEFT JOIN sys_user u ON u.id = n.author_id
+        <where>
+            <if test="category != null and category != ''">
+                n.category = #{category}
+            </if>
+        </where>
+        ORDER BY n.publish_time DESC
+        <if test="limit != null">
+            LIMIT #{limit}
+        </if>
+    </select>
+
+    <select id="selectVOById" resultType="com.huadi.campus.vo.NewsVO">
+        SELECT
+        <include refid="newsVOColumns"/>
+        FROM news n
+        LEFT JOIN sys_user u ON u.id = n.author_id
+        WHERE n.id = #{id}
+    </select>
+
+</mapper>

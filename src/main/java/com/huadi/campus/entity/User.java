@@ -1,79 +1,48 @@
 package com.huadi.campus.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.huadi.campus.enums.UserRole;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
-import jakarta.persistence.Table;
-import jakarta.validation.constraints.Email;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "sys_user")
+/** 登录用户。与 Student、Teacher 等业务表通过 user_id 一对一关联 */
 @Getter
 @Setter
 @NoArgsConstructor
+@TableName("sys_user")
 public class User {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 50)
     private String username;
 
     /** 密码哈希：禁止序列化输出，接口统一通过 VO 返回 */
     @JsonIgnore
-    @Column(nullable = false)
     private String password;
 
-    @Column(nullable = false, length = 100)
     private String realName;
-
-    @Column(length = 50)
     private String phone;
-
-    @Email
-    @Column(length = 100)
     private String email;
-
-    @Column(length = 20)
     private String gender;
-
-    @Column(length = 500)
     private String avatar;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    /** 数据库与 JWT 中均以枚举名存储 */
     private UserRole role;
 
-    @Column(nullable = false)
     private Boolean enabled = true;
 
-    @Column(nullable = false, updatable = false)
+    @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
+    @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
-
-    @PrePersist
-    void onCreate() {
-        this.createTime = LocalDateTime.now();
-        this.updateTime = this.createTime;
-    }
-
-    @PreUpdate
-    void onUpdate() {
-        this.updateTime = LocalDateTime.now();
-    }
 }

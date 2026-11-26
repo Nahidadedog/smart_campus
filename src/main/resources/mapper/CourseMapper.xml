@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.huadi.campus.mapper.CourseMapper">
+
+    <!-- 课程 VO 的公共映射：被 CourseSelectionMapper 以 columnPrefix="c_" 复用 -->
+    <resultMap id="courseVOMap" type="com.huadi.campus.vo.CourseVO">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="code" column="code"/>
+        <result property="credits" column="credits"/>
+        <result property="hours" column="hours"/>
+        <result property="type" column="type"/>
+        <result property="description" column="description"/>
+        <result property="teacherId" column="teacher_id"/>
+        <result property="teacherName" column="teacher_name"/>
+        <result property="semester" column="semester"/>
+        <result property="schedule" column="schedule"/>
+        <result property="classroom" column="classroom"/>
+        <result property="maxStudents" column="max_students"/>
+        <result property="currentStudents" column="current_students"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <sql id="courseVOColumns">
+        c.id, c.name, c.code, c.credits, c.hours, c.type, c.description,
+        t.id            AS teacher_id,
+        u.real_name     AS teacher_name,
+        c.semester, c.schedule, c.classroom, c.max_students, c.current_students, c.create_time
+    </sql>
+
+    <sql id="courseVOJoin">
+        FROM course c
+        LEFT JOIN teacher  t ON t.id = c.teacher_id
+        LEFT JOIN sys_user u ON u.id = t.user_id
+    </sql>
+
+    <!-- 课程目录：三个条件全部可选，动态 SQL 拼接 -->
+    <select id="selectCourseVOList" resultMap="courseVOMap">
+        SELECT
+        <include refid="courseVOColumns"/>
+        <include refid="courseVOJoin"/>
+        <where>
+            <if test="teacherId != null">
+                AND c.teacher_id = #{teacherId}
+            </if>
+            <if test="semester != null and semester != ''">
+                AND c.semester = #{semester}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (LOWER(c.name) LIKE CONCAT('%', LOWER(#{keyword}), '%')
+                 OR LOWER(c.code) LIKE CONCAT('%', LOWER(#{keyword}), '%'))
+            </if>
+        </where>
+        ORDER BY c.id
+    </select>
+
+    <select id="selectCourseVOById" resultMap="courseVOMap">
+        SELECT
+        <include refid="courseVOColumns"/>
+        <include refid="courseVOJoin"/>
+        WHERE c.id = #{id}
+    </select>
+
+</mapper>

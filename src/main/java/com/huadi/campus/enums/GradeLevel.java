@@ -1,10 +1,9 @@
 package com.huadi.campus.enums;
 
-import lombok.Getter;
+import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.RequiredArgsConstructor;
 
-/** 成绩等级（按百分制分数映射） */
-@Getter
+/** 成绩等级（按百分制分数映射）。数据库存枚举名，接口输出中文标签 */
 @RequiredArgsConstructor
 public enum GradeLevel {
 
@@ -15,6 +14,11 @@ public enum GradeLevel {
     FAIL("不及格");
 
     private final String label;
+
+    @JsonValue
+    public String getLabel() {
+        return label;
+    }
 
     public static GradeLevel fromScore(double score) {
         if (score >= 90) return EXCELLENT;

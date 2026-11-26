@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.huadi.campus.mapper.CourseSelectionMapper">
+
+    <resultMap id="selectionVOMap" type="com.huadi.campus.vo.CourseSelectionVO">
+        <id property="id" column="id"/>
+        <result property="status" column="status"/>
+        <result property="createTime" column="create_time"/>
+        <result property="studentId" column="student_id"/>
+        <result property="studentNo" column="student_no"/>
+        <result property="studentName" column="student_name"/>
+        <!-- 嵌套课程信息：列名统一加 c_ 前缀，复用 CourseMapper 的映射 -->
+        <association property="course"
+                     resultMap="com.huadi.campus.mapper.CourseMapper.courseVOMap"
+                     columnPrefix="c_"/>
+    </resultMap>
+
+    <sql id="selectionVOColumns">
+        s.id, s.status, s.create_time,
+        st.id            AS student_id,
+        st.student_no,
+        u.real_name      AS student_name,
+        c.id             AS c_id,
+        c.name           AS c_name,
+        c.code           AS c_code,
+        c.credits        AS c_credits,
+        c.hours          AS c_hours,
+        c.type           AS c_type,
+        c.description    AS c_description,
+        t.id             AS c_teacher_id,
+        tu.real_name     AS c_teacher_name,
+        c.semester       AS c_semester,
+        c.schedule       AS c_schedule,
+        c.classroom      AS c_classroom,
+        c.max_students   AS c_max_students,
+        c.current_students AS c_current_students,
+        c.create_time    AS c_create_time
+    </sql>
+
+    <sql id="selectionVOJoin">
+        FROM course_selection s
+        JOIN student   st ON st.id = s.student_id
+        JOIN sys_user  u  ON u.id  = st.user_id
+        JOIN course    c  ON c.id  = s.course_id
+        LEFT JOIN teacher  t  ON t.id  = c.teacher_id
+        LEFT JOIN sys_user tu ON tu.id = t.user_id
+    </sql>
+
+    <select id="selectVOByStudent" resultMap="selectionVOMap">
+        SELECT
+        <include refid="selectionVOColumns"/>
+        <include refid="selectionVOJoin"/>
+        WHERE s.student_id = #{studentId}
+          AND s.status = #{status}
+        ORDER BY s.create_time DESC
+    </select>
+
+    <select id="selectVOByCourse" resultMap="selectionVOMap">
+        SELECT
+        <include refid="selectionVOColumns"/>
+        <include refid="selectionVOJoin"/>
+        WHERE s.course_id = #{courseId}
+          AND s.status = #{status}
+        ORDER BY st.student_no
+    </select>
+
+</mapper>

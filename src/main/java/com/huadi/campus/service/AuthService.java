@@ -7,8 +7,8 @@ import com.huadi.campus.entity.User;
 import com.huadi.campus.enums.UserRole;
 import com.huadi.campus.exception.ConflictException;
 import com.huadi.campus.exception.UnauthorizedException;
-import com.huadi.campus.repository.StudentRepository;
-import com.huadi.campus.repository.UserRepository;
+import com.huadi.campus.mapper.StudentMapper;
+import com.huadi.campus.mapper.UserMapper;
 import com.huadi.campus.security.JwtService;
 import com.huadi.campus.security.UserPrincipal;
 import com.huadi.campus.vo.LoginVO;
@@ -28,8 +28,8 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-    private final UserRepository userRepository;
-    private final StudentRepository studentRepository;
+    private final UserMapper userMapper;
+    private final StudentMapper studentMapper;
 
     /** 走标准 Spring Security 认证链（UserDetailsService + BCrypt），失败统一返回 401 且不区分用户名/密码错误 */
     @Transactional(readOnly = true)
@@ -42,8 +42,10 @@ public class AuthService {
             throw new UnauthorizedException("用户名或密码错误");
         }
         UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
-        User user = userRepository.findById(principal.id())
-                .orElseThrow(() -> new UnauthorizedException("用户不存在"));
+        User user = userMapper.selectById(principal.id());
+        if (user == null) {
+            throw new UnauthorizedException("用户不存在");
+        }
         String token = jwtService.generateToken(user.getId(), user.getUsername(), user.getRole());
         return LoginVO.from(user, token);
     }
@@ -51,12 +53,13 @@ public class AuthService {
     /** 仅支持学生自助注册；教师 / 领导 / 管理员账号由管理员维护 */
     @Transactional
     public LoginVO register(RegisterRequest request) {
-        if (userRepository.existsByUsername(request.username())) {
+        if (userMapper.existsByUsername(request.username())) {
             throw new ConflictException("用户名已存在");
         }
-        if (studentRepository.existsByStudentNo(request.studentNo())) {
+        if (studentMapper.existsByStudentNo(request.studentNo())) {
             throw new ConflictException("学号已存在");
         }
+
         User user = new User();
         user.setUsername(request.username());
         user.setPassword(passwordEncoder.encode(request.password()));
@@ -64,16 +67,16 @@ public class AuthService {
         user.setPhone(request.phone());
         user.setEmail(request.email());
         user.setRole(UserRole.STUDENT);
-        user = userRepository.save(user);
+        userMapper.insert(user);
 
         Student student = new Student();
-        student.setUser(user);
+        student.setUserId(user.getId());
         student.setStudentNo(request.studentNo());
         student.setDepartment(request.department());
         student.setMajor(request.major());
         student.setClassName(request.className());
         student.setEnrollmentYear(request.enrollmentYear());
-        studentRepository.save(student);
+        studentMapper.insert(student);
 
         return LoginVO.from(user, jwtService.generateToken(user.getId(), user.getUsername(), user.getRole()));
     }

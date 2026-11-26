@@ -1,32 +1,24 @@
 package com.huadi.campus.vo;
 
-import com.huadi.campus.entity.Teacher;
+import lombok.Data;
 
 import java.time.LocalDateTime;
 
 /** 教师信息（已把关联的 User 字段拍平，不含密码） */
-public record TeacherVO(
-        Long id,
-        Long userId,
-        String username,
-        String realName,
-        String phone,
-        String email,
-        String teacherNo,
-        String department,
-        String title,
-        String researchArea,
-        String teacherType,
-        String office,
-        String politicalStatus,
-        LocalDateTime createTime
-) {
-    public static TeacherVO from(Teacher t) {
-        var u = t.getUser();
-        return new TeacherVO(
-                t.getId(), u.getId(), u.getUsername(), u.getRealName(), u.getPhone(), u.getEmail(),
-                t.getTeacherNo(), t.getDepartment(), t.getTitle(), t.getResearchArea(),
-                t.getTeacherType(), t.getOffice(), t.getPoliticalStatus(), t.getCreateTime()
-        );
-    }
+@Data
+public class TeacherVO {
+    private Long id;
+    private Long userId;
+    private String username;
+    private String realName;
+    private String phone;
+    private String email;
+    private String teacherNo;
+    private String department;
+    private String title;
+    private String researchArea;
+    private String teacherType;
+    private String office;
+    private String politicalStatus;
+    private LocalDateTime createTime;
 }

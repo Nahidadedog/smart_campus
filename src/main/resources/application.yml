@@ -7,13 +7,22 @@ spring:
   profiles:
     # 默认使用 dev；生产环境通过 --spring.profiles.active=prod 覆盖
     active: dev
-  jpa:
-    open-in-view: false
-    properties:
-      hibernate:
-        format_sql: true
   jackson:
     time-zone: Asia/Shanghai
+  flyway:
+    # 先执行当前数据库厂商的方言脚本（h2 / mysql），再执行两边通用的 common 脚本
+    locations: classpath:db/migration/{vendor},classpath:db/migration/common
+    # 已有历史库首次接入 Flyway 时自动打基线，新库无影响
+    baseline-on-migrate: true
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    # FULL：带 <association> 的 resultMap 里未显式列出的列也按列名自动映射
+    auto-mapping-behavior: full
+  global-config:
+    banner: false
 
 # 跨域白名单：本地前端开发服务器
 app:

@@ -5,8 +5,8 @@ import com.huadi.campus.entity.Announcement;
 import com.huadi.campus.entity.User;
 import com.huadi.campus.exception.BadRequestException;
 import com.huadi.campus.exception.ResourceNotFoundException;
-import com.huadi.campus.repository.AnnouncementRepository;
-import com.huadi.campus.repository.UserRepository;
+import com.huadi.campus.mapper.AnnouncementMapper;
+import com.huadi.campus.mapper.UserMapper;
 import com.huadi.campus.vo.AnnouncementVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,25 +21,27 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class AnnouncementService {
 
-    private final AnnouncementRepository announcementRepository;
-    private final UserRepository userRepository;
+    private static final int PORTAL_LIMIT = 10;
+
+    private final AnnouncementMapper announcementMapper;
+    private final UserMapper userMapper;
 
     /** 门户展示：按类型筛选，否则返回置顶优先的最近 10 条 */
     public List<AnnouncementVO> listForPortal(String type) {
-        List<Announcement> list = StringUtils.hasText(type)
-                ? announcementRepository.findByTypeOrderByTopDescPublishTimeDesc(type)
-                : announcementRepository.findTop10ByOrderByTopDescPublishTimeDesc();
-        return list.stream().map(AnnouncementVO::from).toList();
+        return announcementMapper.selectVOList(StringUtils.hasText(type) ? type : null, PORTAL_LIMIT);
     }
 
     public AnnouncementVO getById(Long id) {
-        return AnnouncementVO.from(find(id));
+        AnnouncementVO vo = announcementMapper.selectVOById(id);
+        if (vo == null) {
+            throw new ResourceNotFoundException("公告不存在");
+        }
+        return vo;
     }
 
     /** 管理后台：全量列表 */
     public List<AnnouncementVO> listAll() {
-        return announcementRepository.findAll(AnnouncementRepository.DEFAULT_SORT)
-                .stream().map(AnnouncementVO::from).toList();
+        return announcementMapper.selectVOList(null, null);
     }
 
     @Transactional
@@ -47,31 +49,26 @@ public class AnnouncementService {
         if (!StringUtils.hasText(request.type())) {
             throw new BadRequestException("公告类型不能为空");
         }
-        User publisher = userRepository.findById(publisherId)
-                .orElseThrow(() -> new ResourceNotFoundException("发布人不存在"));
+        User publisher = userMapper.selectById(publisherId);
+        if (publisher == null) {
+            throw new ResourceNotFoundException("发布人不存在");
+        }
         Announcement announcement = new Announcement();
         announcement.setTitle(request.title());
         announcement.setContent(request.content());
         announcement.setType(request.type());
         announcement.setTop(request.top());
         announcement.setPublishTime(LocalDateTime.now());
-        announcement.setPublisher(publisher);
-        return AnnouncementVO.from(announcementRepository.save(announcement));
+        announcement.setPublisherId(publisherId);
+        announcementMapper.insert(announcement);
+        return announcementMapper.selectVOById(announcement.getId());
     }
 
     @Transactional
     public void delete(Long id) {
-        if (!announcementRepository.existsById(id)) {
+        if (announcementMapper.selectById(id) == null) {
             throw new ResourceNotFoundException("公告不存在");
         }
-        announcementRepository.deleteById(id);
-    }
-
-    private Announcement find(Long id) {
-        Announcement a = announcementRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("公告不存在"));
-        // 在事务内触发加载发布人，VO 拍平时才不会触发 LazyInitializationException
-        a.getPublisher().getRealName();
-        return a;
+        announcementMapper.deleteById(id);
     }
 }

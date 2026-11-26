@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.huadi.campus.mapper.AnnouncementMapper">
+
+    <sql id="announcementVOColumns">
+        a.id, a.title, a.content, a.type,
+        u.id        AS publisher_id,
+        u.real_name AS publisher_name,
+        a.top, a.publish_time, a.create_time
+    </sql>
+
+    <!-- 置顶优先、发布时间倒序；limit 为空时不截断 -->
+    <select id="selectVOList" resultType="com.huadi.campus.vo.AnnouncementVO">
+        SELECT
+        <include refid="announcementVOColumns"/>
+        FROM announcement a
+        LEFT JOIN sys_user u ON u.id = a.publisher_id
+        <where>
+            <if test="type != null and type != ''">
+                a.type = #{type}
+            </if>
+        </where>
+        ORDER BY a.top DESC, a.publish_time DESC
+        <if test="limit != null">
+            LIMIT #{limit}
+        </if>
+    </select>
+
+    <select id="selectVOById" resultType="com.huadi.campus.vo.AnnouncementVO">
+        SELECT
+        <include refid="announcementVOColumns"/>
+        FROM announcement a
+        LEFT JOIN sys_user u ON u.id = a.publisher_id
+        WHERE a.id = #{id}
+    </select>
+
+</mapper>
